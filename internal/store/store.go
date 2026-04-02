@@ -22,5 +22,24 @@ func now()string{return time.Now().UTC().Format(time.RFC3339)}
 func(d *DB)Create(e *Budget)error{e.ID=genID();e.CreatedAt=now();_,err:=d.db.Exec(`INSERT INTO budgets(id,name,category,allocated,spent,period,start_date,end_date,notes,created_at)VALUES(?,?,?,?,?,?,?,?,?,?)`,e.ID,e.Name,e.Category,e.Allocated,e.Spent,e.Period,e.StartDate,e.EndDate,e.Notes,e.CreatedAt);return err}
 func(d *DB)Get(id string)*Budget{var e Budget;if d.db.QueryRow(`SELECT id,name,category,allocated,spent,period,start_date,end_date,notes,created_at FROM budgets WHERE id=?`,id).Scan(&e.ID,&e.Name,&e.Category,&e.Allocated,&e.Spent,&e.Period,&e.StartDate,&e.EndDate,&e.Notes,&e.CreatedAt)!=nil{return nil};return &e}
 func(d *DB)List()[]Budget{rows,_:=d.db.Query(`SELECT id,name,category,allocated,spent,period,start_date,end_date,notes,created_at FROM budgets ORDER BY created_at DESC`);if rows==nil{return nil};defer rows.Close();var o []Budget;for rows.Next(){var e Budget;rows.Scan(&e.ID,&e.Name,&e.Category,&e.Allocated,&e.Spent,&e.Period,&e.StartDate,&e.EndDate,&e.Notes,&e.CreatedAt);o=append(o,e)};return o}
+func(d *DB)Update(e *Budget)error{_,err:=d.db.Exec(`UPDATE budgets SET name=?,category=?,allocated=?,spent=?,period=?,start_date=?,end_date=?,notes=? WHERE id=?`,e.Name,e.Category,e.Allocated,e.Spent,e.Period,e.StartDate,e.EndDate,e.Notes,e.ID);return err}
 func(d *DB)Delete(id string)error{_,err:=d.db.Exec(`DELETE FROM budgets WHERE id=?`,id);return err}
 func(d *DB)Count()int{var n int;d.db.QueryRow(`SELECT COUNT(*) FROM budgets`).Scan(&n);return n}
+
+func(d *DB)Search(q string, filters map[string]string)[]Budget{
+    where:="1=1"
+    args:=[]any{}
+    if q!=""{
+        where+=" AND (name LIKE ?)"
+        args=append(args,"%"+q+"%");
+    }
+    if v,ok:=filters["category"];ok&&v!=""{where+=" AND category=?";args=append(args,v)}
+    rows,_:=d.db.Query(`SELECT id,name,category,allocated,spent,period,start_date,end_date,notes,created_at FROM budgets WHERE `+where+` ORDER BY created_at DESC`,args...)
+    if rows==nil{return nil};defer rows.Close()
+    var o []Budget;for rows.Next(){var e Budget;rows.Scan(&e.ID,&e.Name,&e.Category,&e.Allocated,&e.Spent,&e.Period,&e.StartDate,&e.EndDate,&e.Notes,&e.CreatedAt);o=append(o,e)};return o
+}
+
+func(d *DB)Stats()map[string]any{
+    m:=map[string]any{"total":d.Count()}
+    return m
+}
